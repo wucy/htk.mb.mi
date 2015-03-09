@@ -27,3 +27,41 @@
 *.i*86
 *.x86_64
 *.hex
+
+# Temp
+*~
+*swp
+*LOG
+
+# Not Used Parts
+env/*
+HLMLib/*
+HLMTools/*
+HTK/*
+HTKBook/*
+HTKLVRec*/*
+
+# Binary
+*.out
+*HBuild
+*HCompV
+*HCopy
+*HDMan
+*HERest
+*HHEd
+*HInit
+*HList
+*HLRescore
+*HLStats
+*HMMIRest
+*HNForward
+*HNTrainSGD
+*HParse
+*HQuant
+*HRest
+*Hresults
+*HSGen
+*HSmooth
+*HVite
+
+

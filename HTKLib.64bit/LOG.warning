@@ -1,0 +1,86 @@
+HFBLat.c: In function 'GetNoContextPhone':
+HFBLat.c:180: warning: cast from pointer to integer of different size
+HFBLat.c:255: warning: cast from pointer to integer of different size
+HFBLat.c: In function 'SetCorrectness':
+HFBLat.c:297: warning: cast from pointer to integer of different size
+HFBLat.c:346: warning: cast from pointer to integer of different size
+HFBLat.c:376: warning: cast from pointer to integer of different size
+HFBLat.c:445: warning: cast from pointer to integer of different size
+HFBLat.c: In function 'SetCorrectnessAsError':
+HFBLat.c:588: warning: cast from pointer to integer of different size
+HFBLat.c:639: warning: cast from pointer to integer of different size
+HFBLat.c:668: warning: cast from pointer to integer of different size
+HFBLat.c: In function 'StepForward':
+HFBLat.c:1444: warning: cast from pointer to integer of different size
+HFBLat.c:1445: warning: cast to pointer from integer of different size
+HFBLat.c: In function 'DoAllMixUpdates':
+HFBLat.c:1116: warning: 'mammi' may be used uninitialized in this function
+HLM.c: In function 'ReadNGrams':
+HLM.c:404: warning: cast to pointer from integer of different size
+HLM.c:427: warning: cast from pointer to integer of different size
+HLM.c: In function 'ReadMatBigram':
+HLM.c:637: warning: overflow in implicit constant conversion
+HLM.c:642: warning: comparison is always false due to limited range of data type
+HLM.c:673: warning: cast from pointer to integer of different size
+HLM.c:675: warning: cast to pointer from integer of different size
+HLM.c: In function 'GetLMProb':
+HLM.c:767: warning: cast from pointer to integer of different size
+HLM.c:772: warning: cast from pointer to integer of different size
+HLM.c:803: warning: cast from pointer to integer of different size
+HLM.c:804: warning: cast from pointer to integer of different size
+HLM.c: In function 'LMTrans':
+HLM.c:917: warning: cast from pointer to integer of different size
+HModel.c: In function 'NewMacro':
+HModel.c:3386: warning: cast from pointer to integer of different size
+HModel.c: In function 'FindMacroStruct':
+HModel.c:3450: warning: cast from pointer to integer of different size
+HModel.c:3458: warning: cast from pointer to integer of different size
+HModel.c: In function 'SetIndexes':
+HModel.c:3967: warning: cast to pointer from integer of different size
+HModel.c:3970: warning: cast from pointer to integer of different size
+HModel.c: In function 'PutBaseClass':
+HModel.c:2958: warning: 'comp' may be used uninitialized in this function
+HModel.c:2958: warning: 'stream' may be used uninitialized in this function
+ar: creating HTKLib.a
+HMem.c: In function 'AllocBlock':
+HMem.c:109: warning: format '%u' expects type 'unsigned int', but argument 2 has type 'size_t'
+HMem.c: In function 'CreateHeap':
+HMem.c:235: warning: format '%u' expects type 'unsigned int', but argument 4 has type 'size_t'
+HMem.c:235: warning: format '%u' expects type 'unsigned int', but argument 6 has type 'size_t'
+HMem.c:235: warning: format '%u' expects type 'unsigned int', but argument 7 has type 'size_t'
+HMem.c: In function 'New':
+HMem.c:342: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:353: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:353: warning: format '%u' expects type 'unsigned int', but argument 4 has type 'size_t'
+HMem.c:377: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c: In function 'Dispose':
+HMem.c:440: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:483: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:492: warning: format '%u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:492: warning: format '%u' expects type 'unsigned int', but argument 4 has type 'size_t'
+HMem.c: In function 'PrintHeapStats':
+HMem.c:513: warning: format '%6u' expects type 'unsigned int', but argument 3 has type 'size_t'
+HMem.c:513: warning: format '%-3u' expects type 'unsigned int', but argument 4 has type 'size_t'
+HMem.c:513: warning: format '%9u' expects type 'unsigned int', but argument 5 has type 'size_t'
+HMem.c:513: warning: format '%9u' expects type 'unsigned int', but argument 6 has type 'size_t'
+HNet.c: In function 'GetSubLat':
+HNet.c:333: warning: cast from pointer to integer of different size
+HNet.c: In function 'PrintNode':
+HNet.c:1616: warning: cast from pointer to integer of different size
+HNet.c:1616: warning: format '%05d' expects type 'int', but argument 2 has type 'long unsigned int'
+HNet.c: In function 'PrintLinks':
+HNet.c:1645: warning: cast from pointer to integer of different size
+HNet.c:1646: warning: format '%05d' expects type 'int', but argument 3 has type 'long unsigned int'
+HNet.c: In function 'FindWordNode':
+HNet.c:2002: warning: cast to pointer from integer of different size
+HParm.c: In function 'OpenAsChannel':
+HParm.c:4172: warning: 'initRows' may be used uninitialized in this function
+HTrain.c: In function 'DumpAccsParallel':
+HTrain.c:1467: warning: dereferencing type-punned pointer will break strict-aliasing rules
+HTrain.c: In function 'LoadAccsParallel':
+HTrain.c:1644: warning: cast from pointer to integer of different size
+HTrain.c:1644: warning: cast to pointer from integer of different size
+HWave.c: In function 'OpenWaveInput':
+HWave.c:998: warning: 'commchunk2.nSamples' may be used uninitialized in this function
+HWave.c:998: note: 'commchunk2.nSamples' was declared here
+

@@ -1,0 +1,60 @@
+HExactMPE.c: In function 'DoCorrectness':
+HExactMPE.c:288: warning: value computed is not used
+HFBLat.c: In function 'DoAllMixUpdates':
+HFBLat.c:1116: warning: 'mammi' may be used uninitialized in this function
+HLM.c: In function 'ReadMatBigram':
+HLM.c:637: warning: integer constant is too large for 'long' type
+HLM.c:637: warning: overflow in implicit constant conversion
+HLM.c:642: warning: integer constant is too large for 'long' type
+HLM.c:642: warning: comparison is always false due to limited range of data type
+HModel.c: In function 'PutBaseClass':
+HModel.c:2958: warning: 'comp' may be used uninitialized in this function
+HModel.c:2958: warning: 'stream' may be used uninitialized in this function
+HParm.c: In function 'OpenAsChannel':
+HParm.c:4172: warning: 'initRows' may be used uninitialized in this function
+HRec.c: In function 'LatFromPaths':
+HRec.c:1520: warning: 'labid' may be used uninitialized in this function
+HRec.c: In function 'ProcessObservation':
+HRec.c:764: warning: 'tok.align' is used uninitialized in this function
+HRec.c:646: note: 'tok.align' was declared here
+HRec.c:764: warning: 'tok.path' is used uninitialized in this function
+HRec.c:646: note: 'tok.path' was declared here
+HRec.c:764: warning: 'tok.lm' is used uninitialized in this function
+HRec.c:646: note: 'tok.lm' was declared here
+HTrain.c: In function 'DumpAccsParallel':
+HTrain.c:1467: warning: dereferencing type-punned pointer will break strict-aliasing rules
+HWave.c: In function 'OpenWaveInput':
+HWave.c:998: warning: 'commchunk2.nSamples' may be used uninitialized in this function
+HWave.c:998: note: 'commchunk2.nSamples' was declared here
+ar: creating HTKLib.a
+HExactMPE.c: In function 'DoCorrectness':
+HExactMPE.c:288: warning: value computed is not used
+HFBLat.c: In function 'DoAllMixUpdates':
+HFBLat.c:1116: warning: 'mammi' may be used uninitialized in this function
+HLat.c:82: warning: 'slaHeap' defined but not used
+HLat.c:82: warning: 'slnHeap' defined but not used
+HLM.c: In function 'ReadMatBigram':
+HLM.c:637: warning: integer constant is too large for 'long' type
+HLM.c:637: warning: overflow in implicit constant conversion
+HLM.c:642: warning: integer constant is too large for 'long' type
+HLM.c:642: warning: comparison is always false due to limited range of data type
+HModel.c: In function 'PutBaseClass':
+HModel.c:2958: warning: 'comp' may be used uninitialized in this function
+HModel.c:2958: warning: 'stream' may be used uninitialized in this function
+HParm.c: In function 'OpenAsChannel':
+HParm.c:4172: warning: 'initRows' may be used uninitialized in this function
+HRec.c: In function 'LatFromPaths':
+HRec.c:1520: warning: 'labid' may be used uninitialized in this function
+HRec.c: In function 'ProcessObservation':
+HRec.c:764: warning: 'tok.align' is used uninitialized in this function
+HRec.c:646: note: 'tok.align' was declared here
+HRec.c:764: warning: 'tok.path' is used uninitialized in this function
+HRec.c:646: note: 'tok.path' was declared here
+HRec.c:764: warning: 'tok.lm' is used uninitialized in this function
+HRec.c:646: note: 'tok.lm' was declared here
+HTrain.c: In function 'DumpAccsParallel':
+HTrain.c:1467: warning: dereferencing type-punned pointer will break strict-aliasing rules
+HWave.c: In function 'OpenWaveInput':
+HWave.c:998: warning: 'commchunk2.nSamples' may be used uninitialized in this function
+HWave.c:998: note: 'commchunk2.nSamples' was declared here
+

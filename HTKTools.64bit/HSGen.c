@@ -1,0 +1,1 @@
+../HTKTools/HSGen.c

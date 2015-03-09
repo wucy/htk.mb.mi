@@ -1,0 +1,1 @@
+../HTKTools/HDMan.c

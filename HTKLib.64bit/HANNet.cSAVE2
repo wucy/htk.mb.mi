@@ -1,0 +1,636 @@
+/* ----------------------------------------------------------- */
+/*                                                             */
+/*                          ___                                */
+/*                       |_| | |_/   SPEECH                    */
+/*                       | | | | \   RECOGNITION               */
+/*                       =========   SOFTWARE                  */
+/*                                                             */
+/*                                                             */
+/* ----------------------------------------------------------- */
+/* developed at:                                               */
+/*                                                             */
+/*      Machine Intelligence Laboratory                        */
+/*      Cambridge University Engineering Department            */
+/*      http://mil.eng.cam.ac.uk/                              */
+/*                                                             */
+/*                                                             */
+/* ----------------------------------------------------------- */
+/*         Copyright: Microsoft Corporation                    */
+/*          1995-2000 Redmond, Washington USA                  */
+/*                    http://www.microsoft.com                 */
+/*                                                             */
+/*              2002  Cambridge University                     */
+/*                    Engineering Department                   */
+/*                                                             */
+/*   Use of this software is governed by a License Agreement   */
+/*    ** See the file License for the Conditions of Use  **    */
+/*    **     This banner notice must not be removed      **    */
+/*                                                             */
+/* ----------------------------------------------------------- */
+/*         File: HANNet.c  ANN Model Definition Data Type      */
+/* ----------------------------------------------------------- */
+
+char *hannet_version = "!HVER!HANNet:   3.4.1 [CUED 30/11/13]";
+char *hannet_vc_id = "$Id: HANNet.c,v 1.1.1.1 2013/11/13 09:54:58 cz277 Exp $";
+
+#include "cfgs.h"
+#include <time.h>
+#include "HShell.h"
+#include "HMem.h"
+#include "HMath.h"
+#include "HSigP.h"
+#include "HWave.h"
+#include "HAudio.h"
+#include "HParm.h"
+#include "HLabel.h"
+#include "HANNet.h"
+#include "HModel.h"
+#include "HTrain.h"
+#include "HNet.h"
+#include "HArc.h"
+#include "HFBLat.h"
+#include "HDict.h"
+#include "HAdapt.h"
+#include <math.h>
+
+/* ------------------------------ Trace Flags ------------------------------ */
+
+static int trace = 0;
+
+#define T_TOP 0001
+#define T_CCH 0002
+
+/* --------------------------- Memory Management --------------------------- */
+
+
+/* ----------------------------- Configuration ------------------------------*/
+
+static ConfParam *cParm[MAXGLOBS];      /* config parameters */
+static int nParm = 0;
+static size_t batchSamples = 1;                 /* the number of samples in batch; 1 sample by default */
+static char *updtFlagStr = NULL;                /* the string pointer indicating the layers to update */
+static int updtIdx = 0;                         /* the index of current update*/
+
+
+/* get the batch size */
+int GetNBatchSamples(void) {
+    return batchSamples;
+}
+
+/* set the batch size */
+void SetNBatchSamples(int userBatchSamples) {
+    batchSamples = userBatchSamples;
+}
+
+/* set the index of current update */
+void SetUpdateIndex(int curUpdtIdx) {
+    updtIdx = curUpdtIdx;
+}
+
+/* get the index of current update */
+int GetUpdateIndex(void) {
+    return updtIdx;
+}
+
+
+/*  */
+void InitANNet(void)
+{
+    int intVal;
+    char buf[MAXSTRLEN];
+
+    Register(hannet_version, hannet_vc_id);
+    nParm = GetConfig("HANNET", TRUE, cParm, MAXGLOBS);
+
+    if (nParm > 0) {
+        if (GetConfInt(cParm, nParm, "TRACE", &intVal)) { 
+            trace = intVal;
+        }
+        if (GetConfInt(cParm, nParm, "BATCHSAMP", &intVal)) {
+            if (intVal <= 0) {
+                HError(9999, "InitANNet: Fail to set batch size");
+            }
+            batchSamples = intVal;
+        }
+        if (GetConfStr(cParm, nParm, "UPDATEFLAGS", buf)) {
+            updtFlagStr = (char *) New(&gcheap, strlen(buf));
+            strcpy(updtFlagStr, buf);
+        }
+    }
+
+    if (TRUE) {
+            /* GPU/MKL/CPU */              /* discard: should be set when compiling */
+            /* THREADS */
+            /* SGD/HF */
+            /* LEARNING RATE SCHEDULE */
+            /*     RELATED STUFFS */
+    }
+}
+
+/* set the update flag for each ANN layer */
+void SetUpdateFlags(ANNSet *annSet) {
+    int i;
+    AILink curAI;
+    ADLink annDef;
+    LELink layerElem;
+    char *charPtr = NULL;
+    char buf[256];
+    
+    if (trace & T_TOP) {
+        printf("SetUpdateFlags: Updating ");
+    }
+
+    if (updtFlagStr != NULL) {
+        strcpy(buf, updtFlagStr);
+        charPtr = strtok(buf, ",");
+        /*charPtr = strtok(updtFlagStr, ",");*/
+    }
+    curAI = annSet->defsHead;
+    while (curAI != NULL) {
+        annDef = curAI->annDef;
+        for (i = 0; i < annDef->layerNum; ++i) {
+            layerElem = annDef->layerList[i];
+            if (charPtr != NULL) {
+                layerElem->trainInfo->updtFlag = atoi(charPtr);
+                charPtr = strtok(NULL, ",");
+            }
+            else {
+                layerElem->trainInfo->updtFlag = ACTFUNUK | BIASUK | WEIGHTUK;
+            }
+            if (trace & T_TOP) {
+                if (!(layerElem->trainInfo->updtFlag & (ACTFUNUK | BIASUK | WEIGHTUK))) {
+                    printf(", NoParam");
+                }
+                else {
+                    printf(", ");
+                    if (layerElem->trainInfo->updtFlag & ACTFUNUK) { 
+                        if (layerElem->actfunKind == HERMITEAF) {
+                            printf("+ActFun");
+                        }
+                    }
+                    if (layerElem->trainInfo->updtFlag & BIASUK) { 
+                        printf("+Bias");
+                    }
+                    if (layerElem->trainInfo->updtFlag & WEIGHTUK) {
+                        printf("+Weight");
+                    }
+                }
+            }
+        }
+        curAI = curAI->next;
+    }
+
+    if (trace & T_TOP) {
+        printf("\n");
+    }
+}
+
+/* TODO: optimise for the CUDA case (parallel by batLen) */
+/* fill batch for a feature mixture */
+/*static inline void FillBatchFromFeaMix(FeaMix *feaMix, int batLen, NMatrix *mixMat) {
+    int i, j, srcOff, dstOff, segLen;
+    FELink feaElem;
+
+    if (feaMix->feaList[0]->feaMat == mixMat) {
+        return;
+    }
+
+    dstOff = 0;
+    for (i = 0; i < batLen; ++i) {
+        for (j = 0; j < feaMix->feaNum; ++j) {
+            feaElem = feaMix->feaList[j];
+            srcOff = i * feaElem->srcDim + feaElem->dimOff;
+            segLen = feaElem->extDim;
+            CopyNSegment(feaElem->feaMat, srcOff, segLen, mixMat, dstOff);
+            dstOff += segLen;
+        }
+    }
+}*/
+
+/* cz277 - split */
+/* TODO: optimise for the CUDA case (parallel by batLen) */
+/* fill batch for a feature mixture */
+static inline void FillBatchFromFeaMixOLD(FeaMix *feaMix, int batLen, NMatrix *mixMat, int *CMDVecPL) {
+    int i, j, k, srcOff = 0, dstOff, segLen = 0;
+    FELink feaElem;
+
+    /* if it is the shared */
+    if (feaMix->feaList[0]->feaMat == mixMat) {
+        return;
+    }
+
+    /* otherwise, fill the batch with a mixture of the FeaElem */
+    for (i = 0, dstOff = 0; i < batLen; ++i) {
+        for (j = 0; j < feaMix->feaNum; ++j, dstOff += segLen) {
+            feaElem = feaMix->feaList[j];
+            if (feaElem->inputKind == INPFEAIK || feaElem->inputKind == AUGFEAIK) {
+                srcOff = i * feaElem->extDim;
+                segLen = feaElem->extDim;
+            }
+            else if (feaElem->inputKind == ANNFEAIK) {	/* ANNFEAIK, left context is consecutive */
+                /* shift previous segments */
+                for (k = 1; k < feaElem->ctxMap[0]; ++k, dstOff += feaElem->feaDim) {
+                    CopyNSegment(mixMat, dstOff + feaElem->feaDim, feaElem->feaDim, mixMat, dstOff);
+                }
+                srcOff = i * feaElem->srcDim;
+                segLen = feaElem->feaDim;
+            }
+            /* copy current segment */
+            CopyNSegment(feaElem->feaMat, srcOff, segLen, mixMat, dstOff);
+        }
+    }
+}
+
+static inline void FillBatchFromFeaMix(FeaMix *feaMix, int batLen, NMatrix *mixMat, int *CMDVecPL) {
+    int i, j, k, srcOff = 0, curOff = 0, dstOff;
+    FELink feaElem;
+
+    /* if it is the shared */
+    if (feaMix->feaList[0]->feaMat == mixMat) {
+        return;
+    }
+
+    /* otherwise, fill the batch with a mixture of the FeaElem */
+    for (i = 0; i < feaMix->feaNum; ++i) {
+        feaElem = feaMix->feaList[i];
+        /*curOff += feaElem->extDim;*/
+        if (feaElem->inputKind == INPFEAIK || feaElem->inputKind == AUGFEAIK) {
+            for (j = 0, srcOff = 0, dstOff = curOff; j < batLen; ++j, srcOff += feaElem->extDim, dstOff += feaMix->feaDim) {
+                CopyNSegment(feaElem->feaMat, srcOff, feaElem->extDim, mixMat, dstOff);
+            }
+        }
+        else if (feaElem->inputKind == ANNFEAIK) {  /* ANNFEAIK, left context is consecutive */
+            for (j = 0; j < batLen; ++j) {
+                /* copy previous segments */
+                for (k = 1, dstOff = j * feaMix->feaDim + curOff; k < feaElem->ctxMap[0]; ++k, dstOff += feaElem->feaDim) {
+                    CopyNSegment(mixMat, dstOff + feaElem->feaDim, feaElem->feaDim, mixMat, dstOff);
+                }
+                /* copy current segment */
+                CopyNSegment(feaElem->feaMat, j * feaElem->srcDim, feaElem->feaDim, mixMat, dstOff);
+            }
+        }
+        curOff += feaElem->extDim;
+    }
+
+}
+
+/* fill a batch with error signal */
+static inline void FillBatchFromErrMix(FeaMix *errMix, int batLen, NMatrix *mixMat) {
+    int i, j, srcOff, dstOff, segLen;
+    FELink errElem;
+
+    /* if it is the shared */
+    if (errMix->feaList[0]->feaMat == mixMat) {
+        return;
+    }
+    /* otherwise, fill the batch with a mixture of the FeaElem */
+    dstOff = 0;
+    /* reset mixMat to 0 */
+    SetNMatrix(0.0, mixMat, batLen);
+    /* accumulate the error signals from each source */
+    for (i = 0; i < batLen; ++i) {
+        for (j = 0; j < errMix->feaNum; ++j) {
+            errElem = errMix->feaList[j];
+            srcOff = i * errElem->srcDim + errElem->dimOff;
+            segLen = errElem->extDim;
+            AddNSegment(errElem->feaMat, srcOff, segLen, mixMat, dstOff);
+            dstOff += segLen;
+        }
+    }
+}
+
+/* temp function */
+void ShowAddress(ANNSet *annSet) {
+    int i;
+    AILink curAI;
+    ADLink annDef;
+    LELink layerElem;
+
+    curAI = annSet->defsHead;
+    while (curAI != NULL) {
+        annDef = curAI->annDef;
+        printf("ANNInfo = %p. ANNDef = %p: \n", curAI, annDef);
+        for (i = 0; i < annDef->layerNum; ++i) {
+            layerElem = annDef->layerList[i];
+            printf("layerElem = %p, feaMix[0]->feaMat = %p, xFeaMat = %p, yFeaMat = %p, trainInfo = %p, dxFeaMat = %p, dyFeaMat = %p, labMat = %p\n", layerElem, layerElem->feaMix->feaList[0]->feaMat, layerElem->xFeaMat, layerElem->yFeaMat, layerElem->trainInfo, layerElem->trainInfo->dxFeaMat, layerElem->trainInfo->dyFeaMat, layerElem->trainInfo->labMat);
+        }
+        printf("\n");
+        curAI = curAI->next;
+    }
+}
+
+/* update the map sum matrix for outputs */
+void UpdateOutMatMapSum(ANNSet *annSet, int batLen, int streamIdx) {
+
+    HNBlasTNgemm(annSet->mapStruct->mappedTargetNum, batLen, annSet->outLayers[streamIdx]->nodeNum, 1.0, annSet->mapStruct->maskMatMapSum[streamIdx], annSet->outLayers[streamIdx]->yFeaMat, 0.0, annSet->mapStruct->outMatMapSum[streamIdx]);
+}
+
+/* update the map sum matrix for labels */
+void UpdateLabMatMapSum(ANNSet *annSet, int batLen, int streamIdx) {
+
+    HNBlasTNgemm(annSet->mapStruct->mappedTargetNum, batLen, annSet->outLayers[streamIdx]->nodeNum, 1.0, annSet->mapStruct->maskMatMapSum[streamIdx], annSet->outLayers[streamIdx]->trainInfo->labMat, 0.0, annSet->mapStruct->labMatMapSum[streamIdx]);
+}
+
+/* the batch with input features are assumed to be filled */
+void ForwardPropBatch(ANNSet *annSet, int batLen) {
+    int i;
+    AILink curAI;
+    ADLink annDef;
+    LELink layerElem;
+
+    /* init the ANNInfo pointer */
+    curAI = annSet->defsHead;
+    /* proceed in the forward fashion */
+    while (curAI != NULL) {
+        /* fetch current ANNDef */
+        annDef = curAI->annDef;
+        /* proceed layer by layer */
+        for (i = 0; i < annDef->layerNum; ++i) {
+            /* get current LayerElem */
+            layerElem = annDef->layerList[i];
+            /* at least the batch (feaMat) for each FeaElem is already */
+            FillBatchFromFeaMix(layerElem->feaMix, batLen, layerElem->xFeaMat, annSet->CMDVecPL);
+            /* do the operation of current layer */
+            switch (layerElem->operKind) {
+                case MAXOK:
+
+                    break;
+                case SUMOK: 
+                    /* y = b, B^T should be row major matrix, duplicate the bias vectors */ 
+                    DupNVector(layerElem->biasVec, layerElem->yFeaMat, batLen);
+                    /* y += w * b, X^T is row major, W^T is column major, Y^T = X^T * W^T + B^T */
+                    HNBlasTNgemm(layerElem->nodeNum, batLen, layerElem->inputDim, 1.0, layerElem->wghtMat, layerElem->xFeaMat, 1.0, layerElem->yFeaMat);
+                    break;
+                case PRODOK:
+
+                    break;
+                default:
+                    HError(9999, "ForwardPropBatch: Unknown layer operation kind");
+            }
+            /* apply activation transformation */
+            switch (layerElem->actfunKind) {
+                case HERMITEAF:
+                    ApplyHermiteAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->actParmVec, layerElem->yFeaMat);
+                    break;
+                case LINEARAF:
+                    break;
+                case RELAF:
+                    ApplyReLAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case SIGMOIDAF:
+                    ApplySigmoidAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case SOFTMAXAF:
+                    ApplySoftmaxAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case SOFTRELAF:
+                    ApplySoftReLAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case SOFTSIGNAF:
+                    ApplySoftSignAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case TANHAF:
+                    ApplyTanHAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                default:
+                    HError(9999, "ForwardPropBatch: Unknown activation function kind");
+            }
+        }
+        /* get the next ANNDef */
+        curAI = curAI->next;
+    }
+}
+
+/* function to compute the error signal for frame level criteria (for sequence level, do nothing) */
+void CalcOutLayerBackwardSignal(LELink layerElem, int batLen, ObjFunKind objfunKind) {
+
+    if (layerElem->roleKind != OUTRK) {
+        HError(9999, "CalcOutLayerBackwardSignal: Function only valid for output layers");
+    }
+
+    switch (objfunKind) {
+        case MMSEOF:
+            /* proceed for MMSE objective function */
+            switch (layerElem->actfunKind) {
+                case HERMITEAF:
+
+                    break;
+                case LINEARAF:
+
+                    break;
+                case RELAF:
+
+                    break;
+                case SIGMOIDAF:
+
+                    break;
+                case SOFTMAXAF:
+
+                    break;
+                case SOFTRELAF:
+
+                    break;
+                case SOFTSIGNAF:
+
+                    break;
+                case TANHAF:
+
+                    break;
+                default:
+                    HError(9999, "CalcOutLayerBackwardSignal: Unknown output activation function");
+            }
+            break;
+        case XENTOF:
+            /* proceed for XENT objective function */
+            switch (layerElem->actfunKind) {
+                case HERMITEAF:
+
+                    break;
+                case LINEARAF:
+
+                    break;
+                case RELAF:
+
+                    break;
+                case SIGMOIDAF:
+
+                    break;
+                case SOFTMAXAF:
+                    SubNMatrix(layerElem->yFeaMat, layerElem->trainInfo->labMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                    break;
+                case SOFTRELAF:
+
+                    break;
+                case SOFTSIGNAF:
+
+                    break;
+                case TANHAF:
+
+                    break;
+                default:
+                    HError(9999, "CalcOutLayerBackwardSignal: Unknown output activation function");
+            }
+            break;
+        case MLOF:
+        case MMIOF:
+        case MPEOF:
+        case MWEOF:
+        case SMBROF:
+            break;
+        default:
+            HError(9999, "CalcOutLayerBackwardSignal: Unknown objective function kind");
+
+    }
+}
+
+/* backward propagation algorithm */
+void BackwardPropBatch(ANNSet *annSet, int batLen, Boolean accFlag) {
+    int i;
+    AILink curAI;
+    ADLink annDef;
+    LELink layerElem;
+    NMatrix *dyFeaMat;
+
+    /* init the ANNInfo pointer */
+    curAI = annSet->defsTail;
+    /* proceed in the backward fashion */
+    while (curAI != NULL) {
+        /* fetch current ANNDef */
+        annDef = curAI->annDef;
+        /* proceed layer by layer */
+        for (i = annDef->layerNum - 1; i >= 0; --i) {
+            /* get current LayerElem */
+            layerElem = annDef->layerList[i];
+            /* proceed different types of layers */
+            if (layerElem->roleKind == OUTRK) {
+                /* set dyFeaMat */
+                dyFeaMat = layerElem->yFeaMat;
+                CalcOutLayerBackwardSignal(layerElem, batLen, annDef->objfunKind);
+            }
+            else {
+                /* set dyFeaMat */
+                dyFeaMat = layerElem->trainInfo->dyFeaMat;
+                /* at least the batch (feaMat) for each FeaElem is already */
+                FillBatchFromErrMix(layerElem->errMix, batLen, dyFeaMat);
+                /* apply activation transformation */
+                switch (layerElem->actfunKind) {
+                    case HERMITEAF:
+                    
+                        break;
+                    case LINEARAF:
+
+                        break;
+                    case RELAF:
+			ApplyDReLAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                        MulNMatrix(layerElem->yFeaMat, dyFeaMat, batLen, layerElem->nodeNum, dyFeaMat);
+                        break;
+                    case SIGMOIDAF:
+                        ApplyDSigmoidAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                        /*MulNMatrix(layerElem->yFeaMat, dyFeaMat, batLen, layerElem->nodeNum, dyFeaMat);*/
+                        break;
+                    case SOFTMAXAF:
+
+                        break;
+                    case SOFTRELAF:
+                        ApplyDSoftReLAct(layerElem->yFeaMat, batLen, layerElem->nodeNum, layerElem->yFeaMat);
+                        /*MulNMatrix(layerElem->yFeaMat, dyFeaMat, batLen, layerElem->nodeNum, dyFeaMat);*/
+                        break;
+                    case SOFTSIGNAF:
+
+                        break;
+                    case TANHAF:
+
+                        break;
+                    default:
+                        HError(9999, "BackwardPropBatch: Unknown hidden activation function kind");
+                }
+                /* times sigma_k (dyFeaMat, from the next layer) */
+                MulNMatrix(layerElem->yFeaMat, dyFeaMat, batLen, layerElem->nodeNum, dyFeaMat);
+            }
+            /* do current layer operation */
+            switch (layerElem->operKind) {
+                case MAXOK:
+
+                    break;
+                case SUMOK:
+                    /* Y^T is row major, W^T is column major, X^T = Y^T * W^T */
+                    HNBlasNNgemm(layerElem->inputDim, batLen, layerElem->nodeNum, 1.0, layerElem->wghtMat, dyFeaMat, 0.0, layerElem->trainInfo->dxFeaMat);
+                    break;
+                case PRODOK:
+
+                    break;
+                default:
+                    HError(9999, "BackwardPropBatch: Unknown layer operation kind");
+            }
+            /* compute and accumulate the updates */
+            /* {layerElem->xFeaMat[n_frames * inputDim]}^T * dyFeaMat[n_frames * nodeNum] = deltaWeights[inputDim * nodeNum] */
+            if (layerElem->trainInfo->updtFlag & WEIGHTUK) 
+                HNBlasNTgemm(layerElem->inputDim, layerElem->nodeNum, batLen, 1.0, layerElem->xFeaMat, dyFeaMat, accFlag, layerElem->trainInfo->gradInfo->wghtMat);
+            /* graidents for biases */
+            if (layerElem->trainInfo->updtFlag & BIASUK) 
+                SumNMatrixByCol(dyFeaMat, batLen, layerElem->nodeNum, accFlag, layerElem->trainInfo->gradInfo->biasVec);
+
+            if (layerElem->trainInfo->ssgInfo != NULL) {
+                /* attention: these two operations are gonna to change dyFeaMat elements to their square */
+                SquaredNMatrix(layerElem->xFeaMat, batLen, layerElem->inputDim, GetTmpNMat());
+                SquaredNMatrix(dyFeaMat, batLen, layerElem->nodeNum, dyFeaMat);
+                if (layerElem->trainInfo->updtFlag & WEIGHTUK)
+                    HNBlasNTgemm(layerElem->inputDim, layerElem->nodeNum, batLen, 1.0, GetTmpNMat(), dyFeaMat, 1.0, layerElem->trainInfo->ssgInfo->wghtMat);
+                if (layerElem->trainInfo->updtFlag & BIASUK) 
+                    SumNMatrixByCol(dyFeaMat, batLen, layerElem->nodeNum, TRUE, layerElem->trainInfo->ssgInfo->biasVec);
+            }
+        }
+
+        /* get the previous ANNDef */
+        curAI = curAI->prev;
+    }
+}
+
+/* randomise an ANN layer */
+void RandANNLayer(LELink layerElem, int seed, float scale) {
+    float r;
+ 
+    r = 4 * sqrt(6.0 / (float) (layerElem->nodeNum + layerElem->inputDim));
+    r *= scale;
+
+    /*if ((!hasReLUActFun) && (layerElem->actfunKind == RELAF)) {
+printf("Using RELU Activation Function!\n");
+        hasReLUActFun = TRUE;
+    }
+    if (hasReLUActFun) {
+        r /= 8;
+    }*/
+
+    RandInit(seed); 
+    RandNSegment(-1.0 * r, r, layerElem->wghtMat->rowNum * layerElem->wghtMat->colNum, layerElem->wghtMat->matElems);
+    SetNVector(0.0, layerElem->biasVec);
+    /*RandNSegment(-1.0 * r, r, layerElem->biasVec->vecLen, layerElem->biasVec->vecElems);*/
+    /* TODO: if HERMITEAF */
+#ifdef CUDA
+    SyncNMatrixHost2Dev(layerElem->wghtMat);
+    SyncNVectorHost2Dev(layerElem->biasVec);
+#endif
+}
+
+/* generate a new ANN layer and randomise it */
+/*LELink GenRandLayer(MemHeap *heap, int nodeNum, int inputDim, int seed) {*/
+LELink GenNewLayer(MemHeap *heap, int nodeNum, int inputDim) {
+     LELink layerElem;
+
+     layerElem = (LELink) New(heap, sizeof(LayerElem));
+     layerElem = GenBlankLayer(heap);
+     /*layerElem->operKind = operKind;
+     layerElem->actfunKind = actfunKind;*/
+     layerElem->nodeNum = nodeNum;
+     layerElem->inputDim = inputDim;
+     layerElem->wghtMat = CreateNMatrix(heap, nodeNum, inputDim);
+     layerElem->biasVec = CreateNVector(heap, nodeNum);
+
+     /*RandANNLayer(layerElem, seed);*/
+
+     return layerElem;     
+}
+
+
+
+
