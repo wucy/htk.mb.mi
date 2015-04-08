@@ -297,6 +297,146 @@ static int nParm = 0;                           /* total num params */
 /* -------------------------- Prototypes -------------------------------- */
 
 
+//cw564 - mb -- begin
+
+//cw564 - mb -- end
+
+/*
+//cw564 - mb -- begin
+#define MAXARRAYLEN 1000000
+static int num_basis = 1;
+static int num_rgc = 1;
+static char lamfn[MAXSTRLEN];
+static char sta2rgcfn[MAXSTRLEN];
+static char hacksegmapfn[MAXSTRLEN];
+static int hackoffset = 100000;
+
+static float * lam[MAXARRAYLEN];
+static int sta2rgc[MAXARRAYLEN];
+static int segmap[MAXARRAYLEN];
+static int segid2spkrid[MAXARRAYLEN];
+
+static char * id2spkrname[MAXARRAYLEN];
+
+static int nMBParm = 0;
+static ConfParam * cMBParm[MAXGLOBS];
+
+static int num_spkr;
+
+void ParseLam(void)
+{
+    FILE * file = fopen(lamfn, "r");
+    if (!file)
+    {
+        HError(9999, "HNMB: Lambda file does not exist.");    
+    }
+    
+    fscanf(file, "%d %d %d", &num_spkr, &num_basis, &num_rgc);
+
+    int per_spkr_dim = num_basis * num_rgc;
+    for (int i = 0; i < num_spkr; ++ i)
+    {
+        char * buf = malloc(sizeof(char) * MAXARRAYLEN);
+        lam[i] = malloc(sizeof(float) * per_spkr_dim);
+
+        fscanf(file, "%s", buf);
+        id2spkrname[i] = buf;
+        for (int j = 0; j < per_spkr_dim; ++ j)
+        {
+            fscanf(file, "%f", &lam[i][j]);
+        }
+    }
+
+    fclose(file);
+}
+
+void ParseSta2Rgc(void)
+{
+    FILE * file = fopen(lamfn, "r");
+    
+    if (!file)
+    {
+        HError(9999, "HNMB: STA2RGC file does not exist.");    
+    }
+
+    int num_sta;
+    int local_num_rgc;
+
+    fscanf(file, "%d %d", &num_sta, &local_num_rgc);
+
+    if (local_num_rgc != num_rgc)
+    {
+        HError(9999, "HNMB: Number of regression class mismatches in LAM and STA2RGC files.");
+    }
+
+    int now_sta, now_rgc;
+    for (int i = 0; i < num_sta; ++ i)
+    {
+        fscanf(file, "%d %d", &now_sta, &now_rgc);
+        sta2rgc[now_sta] = now_rgc;
+    }
+
+    fclose(file);
+}
+
+void ParseSegmap(void)
+{
+    FILE * file = fopen(hacksegmapfn, "r");
+
+    if (!file)
+    {
+        HError(9999, "HNMB: SEGMAP file does not exist.");    
+    }
+    
+
+    fclose(file);
+}
+
+void SetMBConfParms(void)
+{
+    int intVal, tmpInt;
+    double doubleVal;
+    Boolean boolVal;
+    char buf[MAXSTRLEN], buf2[MAXSTRLEN];
+    char *charPtr, *charPtr2;
+    ConfParam *cpVal;
+
+    nMBParm = GetConfig("HNMB", TRUE, cMBParm, MAXGLOBS);
+    if (nMBParm > 0)
+    {
+        if (GetConfInt(cMBParm, nMBParm, "NUMBASIS", &intVal))
+        {
+            num_basis = intVal;
+        }
+        if (GetConfInt(cMBParm, nMBParm, "NUMRGC", &intVal))
+        {
+            num_rgc = intVal;
+        }
+        if (GetConfStr(cMBParm, nMBParm, "LAMFN", buf))
+        {
+            strcpy(buf, lamfn);
+        }
+        if (GetConfStr(cMBParm, nMBParm, "STA2RGCMAPFN", buf))
+        {
+            strcpy(buf, sta2rgcfn);
+        }
+        if (GetConfStr(cMBParm, nMBParm, "HACKSEGMAPFN", buf))
+        {
+            strcpy(buf, hacksegmapfn);
+        }
+        if (GetConfInt(cMBParm, nMBParm, "HACKOFFSET", &intVal))
+        {
+            hackoffset = intVal;
+        }
+    }
+    ParseLam();
+    ParseSta2Rgc();
+    ParseSegmap();
+}
+
+//cw564 - mb -- end
+
+*/
 
 /* ----------------------- Process Command Line ------------------------- */
 
@@ -596,7 +736,7 @@ void SetConfParms(void)
             else if (strcmp(buf, "XENT") == 0) {
                 objfunKind = XENTOF;
                 optTrainMode = FRAMETM;
-                /*showObjFunKind = showObjFunKind | XENTOF;*/
+                showObjFunKind = showObjFunKind | XENTOF; //cw564 - mb - modify
             }
             else {
                 HError(9999, "SetConfParms: Unknown objective function kind");
@@ -999,7 +1139,7 @@ void PrintCriteria(CriteriaInfo *criteria, char *setid) {
         accVal = criteria->cSampAcc / criteria->tSampAcc;
         printf("\t\t%s Accuracy = %.2f%% [%d right out of %d samples]\n", setid, accVal * 100.0, cSampInt, tSampInt);
         if (showObjFunKind & XENTOF) {
-            printf("\t\tCross Entropy/Frame = %.2f\n", criteria->XENTAcc / criteria->tSampAcc);
+            printf("\t\tCross Entropy/Frame = %.7f\n", criteria->XENTAcc / criteria->tSampAcc); //cw564 - mb
         }
         if (showObjFunKind & MMSEOF) {
             printf("\t\tMean Square Error/Frame = %.2f\n", criteria->MMSEAcc / criteria->tSampAcc);
@@ -2305,6 +2445,8 @@ void BatchLevelTrProcess(int curEpochNum) {
     /* cz277 - mmt */
     float momentum = 0.0;
 
+    //exit(0);
+
     S = hset.swidth[0];
     updtCnt = 0;
     sampCnt = 0;
@@ -3090,6 +3232,7 @@ int main(int argc, char *argv[]) {
     InitCUDA();
 #endif
     InitANNet();
+    InitMB(); //cw564 - mb
     InitModel();
     if (InitParm() < SUCCESS) {
         HError(9999, "HNTrainSGD: InitParm failed");

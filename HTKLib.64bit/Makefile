@@ -45,7 +45,7 @@ HLIBS = ${exec_prefix}/lib/HTKLib.a
 #CFLAGS := $(CFLAGS) -m64 -ansi -std=gnu99 -D_SVID_SOURCE -DOSS_AUDIO -D'ARCH="x86_64"' -Wall -Wno-switch -g -O2 -I. -DPHNALG
 #NVCCFLAGS = -c
 CC      = nvcc
-CFLAGS  := -m64 -ccbin gcc -gencode arch=compute_35,code=sm_35 -D'ARCH="x86_64"' 
+CFLAGS  := -m64 -ccbin gcc -gencode arch=compute_35,code=sm_35 -D'ARCH="x86_64"' --compiler-options -std=gnu99
 LDFLAGS = -L/usr/local/cuda/lib -Wl,-rpath=/usr/local/cuda/lib -L/usr/local/cuda/lib64 -Wl,-rpath=/usr/local/cuda/lib64 -lcblas -lpthread
 RANLIB = ranlib
 INSTALL= /usr/bin/install -c

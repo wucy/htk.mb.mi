@@ -6276,9 +6276,14 @@ void CheckANNConsistency(HMMSet *hset) {
 	    /* cz277 - 1007 */
             /* TODO: need to detect cycles */
             /* check the dimensions */
-            if (curAD->layerList[j]->feaMix->mixDim != curAD->layerList[j]->inputDim) {
+            //cw564 - mbt -- begin
+            if (j != curAD->layerNum - 1 && curAD->layerList[j]->feaMix->mixDim != curAD->layerList[j]->inputDim) {
                 HError(9999, "CheckANNConsistency: Input FeaMix dim does not match the input dim of the LayerElem");
             }
+            else if (j == curAD->layerNum - 1 && curAD->layerList[j]->feaMix->mixDim != curAD->layerList[j]->inputDim * MBP()->num_basis) {
+                HError(9999, "CheckANNConsistency: Input FeaMix dim does not match the input dim of the LayerElem");
+            }
+            //cw564 - mbt -- end
         }
         /* fetch the next ANNInfo */
         curAI = curAI->next;
@@ -6312,6 +6317,18 @@ void InitXYBatch(HMMSet *hset) {
             }
             /* init yFeaMat */
             layerElem->yFeaMat = CreateNMatrix(hset->hmem, GetNBatchSamples(), layerElem->nodeNum);
+
+            //cw564 - mb -- begin
+            //initialize the mb basis output
+            if (i == curAD->layerNum - 1)
+            {
+                layerElem->mb_bases_yFeaMat = CreateNMatrix(hset->hmem, GetNBatchSamples() * MBP()->num_basis, layerElem->nodeNum);
+            }
+            else
+            {
+                layerElem->mb_bases_yFeaMat = NULL;
+            }
+            //cw564 - mb -- end
         }
         curAI = curAI->next;
     }

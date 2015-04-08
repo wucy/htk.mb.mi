@@ -1554,6 +1554,11 @@ void CalExtNMatrixL2NormCUDA(NFloat *matPtr, NFloat *vecPtr, int row, int col, N
     HKern_RedMaxElementValue<<<nBlocks, THREADPERBLOCK, sBytes>>>(alphas, 1, row, alphas);
 }
 
+void IntpMBBases()
+{
+
+}
+
 
 /* --------------------------- Trace Flags ------------------------ */
 

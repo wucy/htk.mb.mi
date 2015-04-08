@@ -45,7 +45,7 @@ CC      = 	gcc
 CFLAGS  = 	-m32 -ansi -D_SVID_SOURCE -DOSS_AUDIO -D'ARCH="x86_64"' -Wall -Wno-switch -g -O2 -I$(inc) -DPHNALG
 LDFLAGS = 	-L/usr/X11R6/lib  -lm
 INSTALL = 	/usr/bin/install -c
-PROGS   = 	HBuild HCompV HCopy HDMan \
+PROGS   = 	HSLab HBuild HCompV HCopy HDMan \
 		HERest HHEd HInit HLEd 	HList \
 		HLRescore HLStats HMMIRest HParse \
 		HQuant HRest HResults HSGen HSmooth \

@@ -44,7 +44,7 @@ oldincludedir = /usr/include
 #CC      = 	gcc
 #CFLAGS  = 	-ansi -D_SVID_SOURCE -DOSS_AUDIO -D'ARCH="x86_64"' -Wall -Wno-switch -g -O2 -I$(inc) -DPHNALG
 CC      =       nvcc
-CFLAGS  =       -m64 -ccbin gcc -gencode arch=compute_35,code=sm_35 -D'ARCH="x86_64"' -I$(inc) 
+CFLAGS  =       -m64 -ccbin gcc -gencode arch=compute_35,code=sm_35 -D'ARCH="x86_64"' -I$(inc) --compiler-options -std=gnu99
 LDFLAGS = 	-L/usr/X11R6/lib -lcudart -lcublas -lpthread -lm
 INSTALL = 	/usr/bin/install -c
 PROGS   = 	HBuild HCompV HCopy HDMan \

@@ -239,7 +239,7 @@ static inline void FillBatchFromFeaMix(FeaMix *feaMix, int batLen, int *CMDVecPL
                 hisOff = j * hisDim;
                 if (CMDVecPL != NULL && feaElem->hisMat != NULL) {
                     if (CMDVecPL[j] == 0) {	/* reset the history */
-			ClearNMatrixSegment(feaElem->hisMat, hisOff, hisDim);
+			            ClearNMatrixSegment(feaElem->hisMat, hisOff, hisDim);
                     }
                     else if (CMDVecPL[j] > 0) {	/* shift the history */
                         CopyNSegment(feaElem->hisMat, CMDVecPL[j] * hisDim, hisDim, feaElem->hisMat, hisOff);
@@ -366,7 +366,28 @@ void ForwardPropBatch(ANNSet *annSet, int batLen, int *CMDVecPL) {
                     /* y = b, B^T should be row major matrix, duplicate the bias vectors */ 
                     DupNVector(layerElem->biasVec, layerElem->yFeaMat, batLen);
                     /* y += w * b, X^T is row major, W^T is column major, Y^T = X^T * W^T + B^T */
-                    HNBlasTNgemm(layerElem->nodeNum, batLen, layerElem->inputDim, 1.0, layerElem->wghtMat, layerElem->xFeaMat, 1.0, layerElem->yFeaMat);
+                    
+                    
+                    //cw564 - mb -- begin
+                    if (i == annDef->layerNum - 1)
+                    {
+                        SetNSegmentCUDA(0, layerElem->mb_bases_yFeaMat, batLen * MBP()->num_basis * layerElem->nodeNum);
+
+                        HNBlasTNgemm(layerElem->nodeNum, 
+                                batLen * MBP()->num_basis, 
+                                layerElem->inputDim, 1.0, 
+                                layerElem->wghtMat, layerElem->xFeaMat, 1.0, 
+                                layerElem->mb_bases_yFeaMat);
+                        printf("%d %d %d\n", layerElem->nodeNum, batLen, layerElem->inputDim);
+                        exit(0);
+                    }
+                    else
+                    {
+                        HNBlasTNgemm(layerElem->nodeNum, batLen, layerElem->inputDim, 1.0, layerElem->wghtMat, layerElem->xFeaMat, 1.0, layerElem->yFeaMat);
+                    }
+                    //cw564 - mb -- end
+                    
+                    
                     break;
                 case PRODOK:
 
@@ -749,4 +770,152 @@ Boolean IsNonLinearActFun(ActFunKind actfunKind) {
 
 
 
+//cw564 - mb -- begin
 
+static int nMBParm = 0;
+static ConfParam * cMBParm[MAXGLOBS];
+static MBParam mbp;
+
+static void ParseLam(char * lamfn)
+{
+    FILE * file = fopen(lamfn, "r");
+    if (!file)
+    {
+        HError(9999, "HNMB: Lambda file does not exist.");    
+    }
+
+    int my_num_basis, my_num_rgc;
+
+    fscanf(file, "%d %d %d", &(mbp.num_spkr), &(my_num_basis), &(my_num_rgc));
+    if (my_num_basis != mbp.num_basis || my_num_rgc != mbp.num_rgc)
+    {
+        HError(9999, "HNMB: Num_basis or Num_rgc mismatch.");
+    }
+    
+
+    int per_spkr_dim = mbp.num_basis * mbp.num_rgc;
+    for (int i = 0; i < mbp.num_spkr; ++ i)
+    {
+        char * buf = malloc(sizeof(char) * MAXARRAYLEN);
+        mbp.lam[i] = malloc(sizeof(float) * per_spkr_dim);
+
+        fscanf(file, "%s", buf);
+        mbp.spkrid2spkrname[i] = buf;
+        
+        /*
+        char tmp[256];
+        MaskMatch(mbp.adaptmask, tmp, buf);
+        printf("%s\n", tmp);
+        exit(0);
+        */
+        for (int j = 0; j < per_spkr_dim; ++ j)
+        {
+            fscanf(file, "%f", &(mbp.lam[i][j]));
+        }
+    }
+    
+
+
+    /*
+    printf("NININININI%d\n", mbp.num_spkr);
+    
+    for (int i = 0; i < mbp.num_spkr; ++ i)
+    {
+        printf("%s", mbp.spkrid2spkrname[i]);
+        for (int j = 0; j < per_spkr_dim; ++ j)
+        {
+            printf(" %f", mbp.lam[i][j]);
+        }
+        printf("\n");
+    }
+    exit(0); 
+    */
+
+    fclose(file);
+}
+
+
+static void ParseSta2Rgc(char * s2cfn)
+{
+    FILE * file = fopen(s2cfn, "r");
+    
+    if (!file)
+    {
+        HError(9999, "HNMB: STA2RGC file does not exist.");    
+    }
+
+    int num_sta;
+    int local_num_rgc;
+
+    fscanf(file, "%d %d", &num_sta, &local_num_rgc);
+
+    if (local_num_rgc != mbp.num_rgc)
+    {
+        HError(9999, "HNMB: Number of regression class mismatches in LAM and STA2RGC files.");
+    }
+
+    int now_sta, now_rgc;
+    for (int i = 0; i < num_sta; ++ i)
+    {
+        fscanf(file, "%d %d", &now_sta, &now_rgc);
+        mbp.sta2rgc[now_sta] = now_rgc;
+    }
+
+    /*
+    printf("WOWOWOWOWO %d\n", num_sta);
+    for (int i = 0; i < num_sta; ++ i)
+    {
+        printf("%d->%d ", i, mbp.sta2rgc[i]);
+    }
+    exit(0);
+    */
+
+    fclose(file);
+}
+
+void InitMB(void)
+{
+    int intVal, tmpInt;
+    double doubleVal;
+    Boolean boolVal;
+    char buf[MAXSTRLEN], buf2[MAXSTRLEN];
+    char *charPtr, *charPtr2;
+    ConfParam *cpVal;
+
+    char lamfn[MAXSTRLEN], sta2rgcfn[MAXSTRLEN], adaptmask[MAXSTRLEN];
+
+    nMBParm = GetConfig("HNMB", TRUE, cMBParm, MAXGLOBS);
+    if (nMBParm > 0)
+    {
+        if (GetConfInt(cMBParm, nMBParm, "NUMBASIS", &intVal))
+        {
+            mbp.num_basis = intVal;
+        }
+        if (GetConfInt(cMBParm, nMBParm, "NUMRGC", &intVal))
+        {
+            mbp.num_rgc = intVal;
+        }
+        if (GetConfStr(cMBParm, nMBParm, "LAMFN", buf))
+        {
+            strcpy(lamfn, buf);
+        }
+        if (GetConfStr(cMBParm, nMBParm, "STA2RGCMAPFN", buf))
+        {
+            strcpy(sta2rgcfn, buf);
+        }
+        if (GetConfStr(cMBParm, nMBParm, "ADAPTMASK", buf))
+        {
+            strcpy(mbp.adaptmask, buf);
+        }
+    }
+    
+    ParseLam(lamfn);
+    ParseSta2Rgc(sta2rgcfn);
+}
+
+MBParam * MBP(void)
+{
+    return &mbp;
+}
+
+//cw564 - mb -- end

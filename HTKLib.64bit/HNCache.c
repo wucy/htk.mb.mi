@@ -465,6 +465,10 @@ DataCache *CreateCache(MemHeap *heap, FILE *scpFile, int scpCnt, HMMSet *hset, O
     /* 7. set xfInfo */
     cache->xfInfo = xfInfo;
 
+    
+    cache->uttrIdx2Name = (char* *) malloc(sizeof(char *) * scpCnt); //cw564 - mb
+    cache->uttrIdx2spkrIdx = (int *) malloc(sizeof(int) * scpCnt); //cw564 - mb
+
     return cache;
 }
 
@@ -579,6 +583,27 @@ static ReturnStatus LoadOneUtt(DataCache *cache, int dstPos) {
     if (GetNextScpWord(cache->scpFile, feaBuf) == NULL) {
         HError(9999, "LoadOneUtt: Fail to read the next word in the script");
     }
+
+    //cw564 - mb -- begin
+    cache->uttrIdx2Name[dstPos] = (char *) malloc(sizeof(char) * 256);
+    strcpy(cache->uttrIdx2Name[dstPos], feaBuf);
+
+    char trim[256];
+    MaskMatch(MBP()->adaptmask, trim, cache->uttrIdx2Name[dstPos]);
+    cache->uttrIdx2spkrIdx[dstPos] = -1;
+    for (int i = 0; i < MBP()->num_spkr; ++ i)
+    {
+        if (!strcmp(trim, MBP()->spkrid2spkrname[i]))
+        {
+            cache->uttrIdx2spkrIdx[dstPos] = i;
+        }
+    }
+    if (cache->uttrIdx2spkrIdx[dstPos] == -1)
+    {
+        HError(9999, "HNMB: Missing Lam %s.", trim);
+    }
+    //cw564 - mb -- end
+
     /* monitor speaker change */
     if (cache->xfInfo != NULL) {
         UpdateSpkrStats(cache->hmmSet, cache->xfInfo, feaBuf);
@@ -1030,7 +1055,7 @@ static ReturnStatus UpdateUttOrder(DataCache *cache) {
 
     /* shuffle the indexes if needed */
     if (cache->visitKind == UTTFRMVK || cache->visitKind == UTTVK || cache->visitKind == PLUTTVK || cache->visitKind == PLUTTFRMVK) {
-        ShuffleSegment(cache->uttOrder, cache->stUttPos, cache->edUttPos, sizeof(int));        
+        ShuffleSegment(cache->uttOrder, cache->stUttPos, cache->edUttPos, sizeof(int));   
     }
 
     return SUCCESS;
@@ -1076,6 +1101,7 @@ static ReturnStatus UpdateFrmOrder(DataCache *cache) {
 /* initialise the cache, is used only once */
 void InitCache(DataCache *cache) {
     int i;
+    
 
     /* init cache order */
     for (i = 0; i < cache->tUttNum; ++i) {
@@ -1397,6 +1423,11 @@ static inline int GetDataFromCache(DataCache *cache, FELink feaElem, NFloat *fea
     NFloat *feaPtr;
     UttElem *uttElem;
 
+    
+    //feaElem->frm2scp = (char* *) malloc(sizeof(char *) * cache->batLen); //cw564 - mb -- to be removed
+    
+    feaElem->frm2spkrIdx = (int *) malloc(sizeof(int *) * cache->batLen); //cw564 - mb
+
     /* set the pointers */
     feaPtr = feaBat + offset;
     extDim = feaElem->extDim;
@@ -1408,8 +1439,10 @@ static inline int GetDataFromCache(DataCache *cache, FELink feaElem, NFloat *fea
         uttElem = &cache->uttElems[uttIdx];
         /* make and copy the extended frame */
         CopyExtFrame2Batch(uttElem, frmIdx, feaElem, feaPtr);
-    }
 
+        //feaElem->frm2scp[i] = cache->uttrIdx2Name[cache->frmBatch[i].uttIdx]; //cw564 - mb -- to be removed
+        feaElem->frm2spkrIdx[i] = cache->uttrIdx2spkrIdx[cache->frmBatch[i].uttIdx]; //cw564 - mb
+    }
     return cache->batLen;
 }
 
@@ -1604,6 +1637,13 @@ Boolean FillAllInpBatch(DataCache *cache, int *nSamples, int *uttCnt) {
         SyncNMatrixHost2Dev(cache->labMat);
 #endif
     }
+    
+    //cw564 - mb -- begin
+    if (cache->uttrIdx2spkrIdx != NULL) {
+        
+    }
+    //cw564 - mb -- end
+    
     /* update nSamples */
     *nSamples += cache->batLen;
     /* only applicable to UTT and PLUTT series */

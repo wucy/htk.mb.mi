@@ -90,6 +90,32 @@ typedef struct _ANNDef *ADLink;
 typedef struct _ANNInfo *AILink;
 typedef struct _LayerInfo *LILink;
 
+//cw564 - mb -- begin
+#define MAXARRAYLEN 1000000
+typedef struct _MBParam {
+    int num_basis;
+    int num_rgc;
+    int num_spkr;
+
+    char adaptmask[MAXSTRLEN];
+
+    float * lam[MAXARRAYLEN];
+    int sta2rgc[MAXARRAYLEN];
+
+    char * uttrid2spkrname[MAXARRAYLEN];
+    char * uttrid2uttrname[MAXARRAYLEN];
+    int uttrid2spkrid[MAXARRAYLEN];
+    char * spkrid2spkrname[MAXARRAYLEN];
+
+} MBParam;
+
+
+extern void InitMB(void);
+extern MBParam * MBP(void);
+
+//cw564 - mb -- end
+
+
 typedef struct _FeaElem {
     int feaDim;                 /* the dimension of this kind of feature (without context expansion) */
     int extDim;                 /* the dimension of this kind of feature (with context expansion and transforms) */
@@ -111,6 +137,10 @@ typedef struct _FeaElem {
     int hisLen;			/* the length of the history */
     NMatrix *hisMat;		/* the matrix for ANN feature history */
     int nUse;                   /* the usage counter */
+
+    char* * frm2scp; //cw564 - mb -- to be removed
+    int * frm2spkrIdx; //cw564 - mb
+
 } FeaElem;
 
 typedef struct _FeaMix {
@@ -172,6 +202,9 @@ typedef struct _LayerElem {
     LayerRoleKind roleKind;     /* the role of current layer */
     int nUse;                   /* usage counter */
     int nDrv;                   /* feature derived counter */
+    
+    NMatrix *mb_bases_yFeaMat; //cw564 - mb
+
     /*ANNUpdtKind updtFlag;*/       /* whether update this layer or not */
     /* cz277 - gradprobe */
 #ifdef GRADPROBE
@@ -226,6 +259,9 @@ typedef struct _ANNSet {
     TargetMapStruct *mapStruct;	/* the structure for target mapping */
     NMatrix *llhMat[SMAX];	/* the llr matrix of the yFeaMat of the output layers */
     NVector *penVec[SMAX];
+    
+    MBParam mbp;
+
 } ANNSet;
 
 /* ------------------------ Global Settings ------------------------- */

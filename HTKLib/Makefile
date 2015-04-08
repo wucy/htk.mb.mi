@@ -43,7 +43,6 @@ HLIBS = ${exec_prefix}/lib/HTKLib.a
 
 CC     = gcc
 CFLAGS := $(CFLAGS) -m32 -ansi -D_SVID_SOURCE -DOSS_AUDIO -D'ARCH="x86_64"' -Wall -Wno-switch -g -O2 -I. -DPHNALG
-# CFLAGS := $(CFLAGS) -m32 -ansi -D_SVID_SOURCE -DOSS_AUDIO -D'ARCH="x86_64"' -Wall -Wno-switch -g -I. -DPHNALG
 RANLIB = ranlib
 INSTALL= /usr/bin/install -c
 target = HTKLib.a

@@ -161,6 +161,10 @@ typedef struct _DataCache {
     XFInfo *xfInfo;
     pthread_t extThread;	/* cz277 - mtload */
     Boolean firstLoad;		/* cz277 - mtload */
+    
+    char* * uttrIdx2Name; //cw564 - mb -- to be removed
+    int * uttrIdx2spkrIdx; //cw564 - mb
+
 } DataCache;
 
 /* ------------------------ Global Settings ------------------------- */
